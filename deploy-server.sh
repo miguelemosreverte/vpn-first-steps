@@ -45,11 +45,17 @@ go build -o vpn-server main.go
 # Stop existing server if running
 pkill -f vpn-server || true
 
+# Configure NAT for VPN traffic
+echo "Configuring NAT..."
+iptables -t nat -F POSTROUTING 2>/dev/null || true
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -o eth0 -j MASQUERADE
+
 # Start server
 echo "Starting VPN server..."
 nohup ./vpn-server -port 8888 > /var/log/vpn-server.log 2>&1 &
 
 echo "VPN server deployed and started!"
+echo "NAT configured for 10.8.0.0/24"
 echo "View logs: tail -f /var/log/vpn-server.log"
 ENDSSH
 
