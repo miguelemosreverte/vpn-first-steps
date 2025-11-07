@@ -110,9 +110,6 @@ func (s *VPNServer) encryptData(data []byte) ([]byte, error) {
 
 // decryptData always decrypts the data (doesn't check s.encryption flag)
 func (s *VPNServer) decryptData(data []byte) ([]byte, error) {
-	log.Printf("[DECRYPT DEBUG] Input size: %d bytes", len(data))
-	log.Printf("[DECRYPT DEBUG] Input first 16 bytes: %x", data[:minInt(16, len(data))])
-
 	block, err := aes.NewCipher(s.key)
 	if err != nil {
 		return nil, err
@@ -124,25 +121,16 @@ func (s *VPNServer) decryptData(data []byte) ([]byte, error) {
 	}
 
 	nonceSize := gcm.NonceSize()
-	log.Printf("[DECRYPT DEBUG] Nonce size: %d", nonceSize)
-
 	if len(data) < nonceSize {
 		return nil, fmt.Errorf("ciphertext too short")
 	}
 
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
-	log.Printf("[DECRYPT DEBUG] Nonce: %x", nonce)
-	log.Printf("[DECRYPT DEBUG] Ciphertext size: %d", len(ciphertext))
-	log.Printf("[DECRYPT DEBUG] Ciphertext first 16 bytes: %x", ciphertext[:minInt(16, len(ciphertext))])
-
 	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		log.Printf("[DECRYPT DEBUG] GCM.Open failed: %v", err)
 		return nil, err
 	}
 
-	log.Printf("[DECRYPT DEBUG] Plaintext size: %d", len(plaintext))
-	log.Printf("[DECRYPT DEBUG] Plaintext first 4 bytes: %x", plaintext[:minInt(4, len(plaintext))])
 	return plaintext, nil
 }
 
@@ -229,13 +217,11 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 			var packet []byte
 			var err error
 			if clientWantsEncryption {
-				log.Printf("[SERVER IN] Received encrypted: %d bytes", len(buffer))
 				packet, err = s.decryptData(buffer)
 				if err != nil {
 					log.Printf("Decryption error: %v", err)
 					continue
 				}
-				log.Printf("[SERVER IN] After decrypt: %d bytes, first 4 bytes: %x", len(packet), packet[:minInt(4, len(packet))])
 			} else {
 				packet = buffer
 			}

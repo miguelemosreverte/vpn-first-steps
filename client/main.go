@@ -229,9 +229,6 @@ func (c *VPNClient) encrypt(data []byte) ([]byte, error) {
 		return data, nil
 	}
 
-	log.Printf("[ENCRYPT DEBUG] Input size: %d bytes", len(data))
-	log.Printf("[ENCRYPT DEBUG] Input first 4 bytes: %x", data[:min(4, len(data))])
-
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
 		return nil, err
@@ -247,13 +244,7 @@ func (c *VPNClient) encrypt(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	log.Printf("[ENCRYPT DEBUG] Nonce size: %d", gcm.NonceSize())
-	log.Printf("[ENCRYPT DEBUG] Nonce: %x", nonce)
-
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
-	log.Printf("[ENCRYPT DEBUG] Output size: %d bytes", len(ciphertext))
-	log.Printf("[ENCRYPT DEBUG] Output first 16 bytes: %x", ciphertext[:min(16, len(ciphertext))])
-
 	return ciphertext, nil
 }
 
@@ -332,10 +323,6 @@ func (c *VPNClient) Connect() error {
 
 			packet := buffer[:n]
 
-			// DEBUG: Log packet details when encryption is on
-			if c.encryption {
-				log.Printf("[CLIENT OUT] Read from TUN: %d bytes, first 4 bytes: %x", n, packet[:min(4, len(packet))])
-			}
 
 			encrypted, err := c.encrypt(packet)
 			if err != nil {
@@ -343,9 +330,6 @@ func (c *VPNClient) Connect() error {
 				continue
 			}
 
-			if c.encryption {
-				log.Printf("[CLIENT OUT] After encrypt: %d bytes", len(encrypted))
-			}
 
 			// Send packet length first, then packet
 			length := make([]byte, 4)
@@ -388,9 +372,6 @@ func (c *VPNClient) Connect() error {
 				return
 			}
 
-			if c.encryption {
-				log.Printf("[CLIENT IN] Received encrypted: %d bytes", len(buffer))
-			}
 
 			packet, err := c.decrypt(buffer)
 			if err != nil {
@@ -398,9 +379,6 @@ func (c *VPNClient) Connect() error {
 				continue
 			}
 
-			if c.encryption {
-				log.Printf("[CLIENT IN] After decrypt: %d bytes, first 4 bytes: %x", len(packet), packet[:min(4, len(packet))])
-			}
 
 			if _, err := c.tunIface.Write(packet); err != nil {
 				log.Printf("TUN write error: %v", err)
