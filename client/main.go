@@ -229,6 +229,9 @@ func (c *VPNClient) encrypt(data []byte) ([]byte, error) {
 		return data, nil
 	}
 
+	log.Printf("[ENCRYPT DEBUG] Input size: %d bytes", len(data))
+	log.Printf("[ENCRYPT DEBUG] Input first 4 bytes: %x", data[:min(4, len(data))])
+
 	block, err := aes.NewCipher(c.key)
 	if err != nil {
 		return nil, err
@@ -244,7 +247,13 @@ func (c *VPNClient) encrypt(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	log.Printf("[ENCRYPT DEBUG] Nonce size: %d", gcm.NonceSize())
+	log.Printf("[ENCRYPT DEBUG] Nonce: %x", nonce)
+
 	ciphertext := gcm.Seal(nonce, nonce, data, nil)
+	log.Printf("[ENCRYPT DEBUG] Output size: %d bytes", len(ciphertext))
+	log.Printf("[ENCRYPT DEBUG] Output first 16 bytes: %x", ciphertext[:min(16, len(ciphertext))])
+
 	return ciphertext, nil
 }
 
