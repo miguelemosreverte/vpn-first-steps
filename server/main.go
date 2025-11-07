@@ -37,10 +37,17 @@ func NewVPNServer(listenAddr string, encryption bool, key []byte) *VPNServer {
 }
 
 func (s *VPNServer) setupTUN() error {
+	// Load TUN module
+	exec.Command("modprobe", "tun").Run()
+
+	// Delete existing TUN device if it exists
+	exec.Command("ip", "link", "delete", TUN_DEVICE).Run()
+
 	// Create TUN device
 	cmd := exec.Command("ip", "tuntap", "add", "mode", "tun", "dev", TUN_DEVICE)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create TUN device: %v", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create TUN device: %v - %s", err, string(output))
 	}
 
 	// Assign IP address
