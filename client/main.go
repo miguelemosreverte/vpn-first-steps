@@ -43,20 +43,26 @@ func NewVPNClient(serverAddr string, encryption bool, key []byte) *VPNClient {
 }
 
 func (c *VPNClient) setupTUN() error {
+	// Load TUN module
+	exec.Command("modprobe", "tun").Run()
+
+	// Delete existing TUN device if it exists
+	exec.Command("ip", "link", "delete", TUN_DEVICE).Run()
+
 	// Create TUN device
-	cmd := exec.Command("sudo", "ip", "tuntap", "add", "mode", "tun", "dev", TUN_DEVICE)
+	cmd := exec.Command("ip", "tuntap", "add", "mode", "tun", "dev", TUN_DEVICE)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to create TUN device: %v", err)
 	}
 
 	// Assign IP address
-	cmd = exec.Command("sudo", "ip", "addr", "add", CLIENT_IP+"/24", "dev", TUN_DEVICE)
+	cmd = exec.Command("ip", "addr", "add", CLIENT_IP+"/24", "dev", TUN_DEVICE)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to assign IP: %v", err)
 	}
 
 	// Bring interface up
-	cmd = exec.Command("sudo", "ip", "link", "set", "dev", TUN_DEVICE, "up")
+	cmd = exec.Command("ip", "link", "set", "dev", TUN_DEVICE, "up")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to bring interface up: %v", err)
 	}
@@ -92,19 +98,19 @@ func (c *VPNClient) routeAllTraffic() error {
 
 	// Add route to VPN server through original gateway
 	serverHost, _, _ := net.SplitHostPort(c.serverAddr)
-	cmd := exec.Command("sudo", "ip", "route", "add", serverHost, "via", c.originalGW)
+	cmd := exec.Command("ip", "route", "add", serverHost, "via", c.originalGW)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Warning: failed to add server route: %v", err)
 	}
 
 	// Delete default route
-	cmd = exec.Command("sudo", "ip", "route", "del", "default")
+	cmd = exec.Command("ip", "route", "del", "default")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete default route: %v", err)
 	}
 
 	// Add default route through VPN
-	cmd = exec.Command("sudo", "ip", "route", "add", "default", "via", SERVER_IP, "dev", TUN_DEVICE)
+	cmd = exec.Command("ip", "route", "add", "default", "via", SERVER_IP, "dev", TUN_DEVICE)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to add VPN route: %v", err)
 	}
@@ -115,14 +121,14 @@ func (c *VPNClient) routeAllTraffic() error {
 
 func (c *VPNClient) restoreRouting() error {
 	// Delete VPN default route
-	cmd := exec.Command("sudo", "ip", "route", "del", "default", "dev", TUN_DEVICE)
+	cmd := exec.Command("ip", "route", "del", "default", "dev", TUN_DEVICE)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Warning: failed to delete VPN route: %v", err)
 	}
 
 	// Restore original default route
 	if c.originalGW != "" {
-		cmd = exec.Command("sudo", "ip", "route", "add", "default", "via", c.originalGW)
+		cmd = exec.Command("ip", "route", "add", "default", "via", c.originalGW)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to restore default route: %v", err)
 		}
@@ -137,10 +143,10 @@ func (c *VPNClient) cleanupTUN() error {
 		c.tunFile.Close()
 	}
 
-	cmd := exec.Command("sudo", "ip", "link", "set", "dev", TUN_DEVICE, "down")
+	cmd := exec.Command("ip", "link", "set", "dev", TUN_DEVICE, "down")
 	cmd.Run()
 
-	cmd = exec.Command("sudo", "ip", "tuntap", "del", "mode", "tun", "dev", TUN_DEVICE)
+	cmd = exec.Command("ip", "tuntap", "del", "mode", "tun", "dev", TUN_DEVICE)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete TUN device: %v", err)
 	}
