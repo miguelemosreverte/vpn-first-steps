@@ -33,9 +33,10 @@ type VPNClient struct {
 	originalGW string
 }
 
-func NewVPNClient(serverAddr string, key []byte) *VPNClient {
+func NewVPNClient(serverAddr string, encryption bool, key []byte) *VPNClient {
 	return &VPNClient{
 		serverAddr: serverAddr,
+		encryption: encryption,
 		key:        key,
 		enabled:    false,
 	}
@@ -210,12 +211,14 @@ func (c *VPNClient) Connect() error {
 	c.conn = conn
 	log.Printf("Connected to VPN server at %s", c.serverAddr)
 
-	// Read encryption status from server
-	encryptByte := make([]byte, 1)
-	if _, err := conn.Read(encryptByte); err != nil {
-		return fmt.Errorf("failed to read encryption status: %v", err)
+	// Send encryption preference to server
+	encryptByte := byte(0)
+	if c.encryption {
+		encryptByte = byte(1)
 	}
-	c.encryption = encryptByte[0] == 1
+	if _, err := conn.Write([]byte{encryptByte}); err != nil {
+		return fmt.Errorf("failed to send encryption preference: %v", err)
+	}
 	log.Printf("Encryption: %v", c.encryption)
 
 	// Setup TUN
@@ -340,6 +343,7 @@ func (c *VPNClient) Disconnect() error {
 
 func main() {
 	server := flag.String("server", "", "VPN server address (e.g., 95.217.238.72:8888)")
+	encrypt := flag.Bool("encrypt", false, "Enable encryption")
 	flag.Parse()
 
 	if *server == "" {
@@ -349,7 +353,7 @@ func main() {
 	// Use same key as server (in production, use proper key exchange)
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes for AES-256
 
-	client := NewVPNClient(*server, key)
+	client := NewVPNClient(*server, *encrypt, key)
 	if err := client.Connect(); err != nil {
 		log.Fatal(err)
 	}

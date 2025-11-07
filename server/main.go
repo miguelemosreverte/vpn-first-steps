@@ -129,15 +129,14 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 	defer conn.Close()
 	log.Printf("Client connected from %s", conn.RemoteAddr())
 
-	// Send encryption status
-	encryptByte := byte(0)
-	if s.encryption {
-		encryptByte = byte(1)
-	}
-	if _, err := conn.Write([]byte{encryptByte}); err != nil {
-		log.Printf("Failed to send encryption status: %v", err)
+	// Read client's encryption preference
+	encryptByte := make([]byte, 1)
+	if _, err := conn.Read(encryptByte); err != nil {
+		log.Printf("Failed to read client encryption preference: %v", err)
 		return
 	}
+	clientWantsEncryption := encryptByte[0] == 1
+	log.Printf("Client encryption preference: %v", clientWantsEncryption)
 
 	// Channel for graceful shutdown
 	done := make(chan bool)
@@ -154,10 +153,15 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 			}
 
 			packet := buffer[:n]
-			encrypted, err := s.encrypt(packet)
-			if err != nil {
-				log.Printf("Encryption error: %v", err)
-				continue
+			var encrypted []byte
+			if clientWantsEncryption {
+				encrypted, err = s.encrypt(packet)
+				if err != nil {
+					log.Printf("Encryption error: %v", err)
+					continue
+				}
+			} else {
+				encrypted = packet
 			}
 
 			// Send packet length first (4 bytes), then packet
@@ -201,10 +205,15 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 				return
 			}
 
-			packet, err := s.decrypt(buffer)
-			if err != nil {
-				log.Printf("Decryption error: %v", err)
-				continue
+			var packet []byte
+			if clientWantsEncryption {
+				packet, err = s.decrypt(buffer)
+				if err != nil {
+					log.Printf("Decryption error: %v", err)
+					continue
+				}
+			} else {
+				packet = buffer
 			}
 
 			if _, err := s.tunFile.Write(packet); err != nil {
@@ -244,12 +253,11 @@ func (s *VPNServer) Start() error {
 
 func main() {
 	port := flag.String("port", "8888", "Port to listen on")
-	encrypt := flag.Bool("encrypt", false, "Enable encryption")
 	flag.Parse()
 
 	// Generate or use a fixed key (in production, use proper key management)
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes for AES-256
 
-	server := NewVPNServer(":"+*port, *encrypt, key)
+	server := NewVPNServer(":"+*port, false, key)
 	log.Fatal(server.Start())
 }

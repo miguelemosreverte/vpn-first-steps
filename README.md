@@ -48,7 +48,7 @@ chmod +x deploy-server.sh
 ./deploy-server.sh
 ```
 
-The server will start with encryption **enabled** by default on port 8888.
+The server will start on port 8888 and accept both encrypted and plain connections.
 
 ### 2. Build and Run Client
 
@@ -57,8 +57,11 @@ The server will start with encryption **enabled** by default on port 8888.
 chmod +x build-client.sh
 ./build-client.sh
 
-# Connect to VPN (requires sudo for TUN interface)
+# Connect to VPN without encryption (development mode)
 sudo ./client/vpn-client -server 95.217.238.72:8888
+
+# Or with encryption enabled
+sudo ./client/vpn-client -server 95.217.238.72:8888 -encrypt
 ```
 
 Press **Ctrl+C** to disconnect and restore normal routing.
@@ -69,22 +72,22 @@ Press **Ctrl+C** to disconnect and restore normal routing.
 
 Run on server manually:
 ```bash
-# With encryption (default)
-./server/vpn-server -port 8888 -encrypt
-
-# Without encryption
+# Start VPN server (handles both encrypted and plain traffic)
 ./server/vpn-server -port 8888
 ```
 
 ### Client Options
 
 ```bash
-# Connect to VPN
+# Connect without encryption (default, for development)
 sudo ./client/vpn-client -server <SERVER_IP>:8888
+
+# Connect with encryption
+sudo ./client/vpn-client -server <SERVER_IP>:8888 -encrypt
 ```
 
 The client automatically:
-- Detects server encryption setting
+- Sends encryption preference to server
 - Creates TUN interface (10.8.0.2/24)
 - Routes all traffic through VPN
 - Restores original routing on disconnect
@@ -96,60 +99,57 @@ The client automatically:
 1. Creates TUN device (`tun0`) with IP `10.8.0.1/24`
 2. Enables IP forwarding
 3. Listens for TCP connections on port 8888
-4. Encrypts/decrypts packets (if encryption enabled)
-5. Forwards packets between TUN interface and client
+4. Reads client encryption preference
+5. Encrypts/decrypts packets based on client preference
+6. Forwards packets between TUN interface and client
 
 ### Client Side
 
 1. Connects to VPN server via TCP
-2. Creates TUN device (`tun0`) with IP `10.8.0.2/24`
-3. Saves current default gateway
-4. Adds route to VPN server through original gateway
-5. Routes all other traffic through VPN
-6. Encrypts/decrypts packets (matching server setting)
-7. On disconnect: restores original routing and cleans up TUN device
+2. Sends encryption preference to server
+3. Creates TUN device (`tun0`) with IP `10.8.0.2/24`
+4. Saves current default gateway
+5. Adds route to VPN server through original gateway
+6. Routes all other traffic through VPN
+7. Encrypts/decrypts packets if `-encrypt` flag is set
+8. On disconnect: restores original routing and cleans up TUN device
 
 ### Encryption
 
 - **Algorithm**: AES-256-GCM
 - **Key**: Shared 32-byte key (hardcoded for prototype)
-- **Toggle**: Server controls encryption via `-encrypt` flag
-- **Handshake**: Server sends encryption status on connect
+- **Toggle**: Client controls encryption via `-encrypt` flag (default: off)
+- **Handshake**: Client sends encryption preference on connect
 
 ## Testing
 
-### Test Without Encryption
+### Test Without Encryption (Development Mode)
 
-1. Deploy server without encryption:
-```bash
-# On server
-./server/vpn-server -port 8888
-```
-
-2. Connect client:
+1. Connect client without encryption:
 ```bash
 sudo ./client/vpn-client -server 95.217.238.72:8888
 ```
 
-3. Verify your IP changed:
+2. Verify your IP changed:
 ```bash
 curl ifconfig.me
 ```
 
+3. Check logs show "Encryption: false"
+
 ### Test With Encryption
 
-1. Deploy server with encryption:
+1. Connect client with encryption:
 ```bash
-# On server
-./server/vpn-server -port 8888 -encrypt
+sudo ./client/vpn-client -server 95.217.238.72:8888 -encrypt
 ```
 
-2. Connect client (auto-detects encryption):
+2. Verify your IP changed:
 ```bash
-sudo ./client/vpn-client -server 95.217.238.72:8888
+curl ifconfig.me
 ```
 
-3. Verify connection in logs shows "Encryption: true"
+3. Check logs show "Encryption: true"
 
 ## Deployment
 
@@ -158,7 +158,7 @@ The deployment script (`deploy-server.sh`):
 - Installs Go if needed
 - Clones/updates the repository
 - Builds the server
-- Starts the VPN server with encryption enabled
+- Starts the VPN server (accepts both encrypted and plain connections)
 
 To redeploy after changes:
 ```bash

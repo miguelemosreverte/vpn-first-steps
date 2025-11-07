@@ -47,7 +47,7 @@ pkill -f vpn-server || true
 
 # Start server
 echo "Starting VPN server..."
-nohup ./vpn-server -port 8888 -encrypt > /var/log/vpn-server.log 2>&1 &
+nohup ./vpn-server -port 8888 > /var/log/vpn-server.log 2>&1 &
 
 echo "VPN server deployed and started!"
 echo "View logs: tail -f /var/log/vpn-server.log"
