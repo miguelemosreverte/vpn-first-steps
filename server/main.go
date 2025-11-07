@@ -206,6 +206,7 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 			}
 
 			var packet []byte
+			var err error
 			if clientWantsEncryption {
 				packet, err = s.decrypt(buffer)
 				if err != nil {
