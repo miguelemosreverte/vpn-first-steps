@@ -87,11 +87,8 @@ func (s *VPNServer) setupTUN() error {
 	return nil
 }
 
-func (s *VPNServer) encrypt(data []byte) ([]byte, error) {
-	if !s.encryption {
-		return data, nil
-	}
-
+// encryptData always encrypts the data (doesn't check s.encryption flag)
+func (s *VPNServer) encryptData(data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(s.key)
 	if err != nil {
 		return nil, err
@@ -111,11 +108,8 @@ func (s *VPNServer) encrypt(data []byte) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func (s *VPNServer) decrypt(data []byte) ([]byte, error) {
-	if !s.encryption {
-		return data, nil
-	}
-
+// decryptData always decrypts the data (doesn't check s.encryption flag)
+func (s *VPNServer) decryptData(data []byte) ([]byte, error) {
 	log.Printf("[DECRYPT DEBUG] Input size: %d bytes", len(data))
 	log.Printf("[DECRYPT DEBUG] Input first 16 bytes: %x", data[:minInt(16, len(data))])
 
@@ -182,7 +176,7 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 			packet := buffer[:n]
 			var encrypted []byte
 			if clientWantsEncryption {
-				encrypted, err = s.encrypt(packet)
+				encrypted, err = s.encryptData(packet)
 				if err != nil {
 					log.Printf("Encryption error: %v", err)
 					continue
@@ -236,7 +230,7 @@ func (s *VPNServer) handleClient(conn net.Conn) {
 			var err error
 			if clientWantsEncryption {
 				log.Printf("[SERVER IN] Received encrypted: %d bytes", len(buffer))
-				packet, err = s.decrypt(buffer)
+				packet, err = s.decryptData(buffer)
 				if err != nil {
 					log.Printf("Decryption error: %v", err)
 					continue
