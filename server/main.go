@@ -10,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"os"
 	"os/exec"
 
 	"github.com/songgao/water"
